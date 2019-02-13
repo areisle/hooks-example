@@ -4,24 +4,34 @@ import "./App.css";
 
 let renders = 0;
 
-function App(props) {
+const useSWAPI = (url) => {
 
     const pageSize = 10;
-    const [people, setPeople ] = useState([]);
+    const [ results, setResults ] = useState([]);
     const [next, setNext ] = useState(null);
     const [previous, setPrevious ] = useState(null);
     const [page, setPage ] = useState(1);
     const [count, setCount ] = useState(0);
     const [request, setRequest] = useState(null);
 
+    const getNext = async () => {
+        await getPage(next);
+        setPage(page + 1)
+    }
+
+    const getPrevious = async () => {
+        await getPage(previous);
+        setPage(page - 1)
+    }
+
     useEffect(() => {
-        getPage('https://swapi.co/api/people');
+        getPage(url);
         return () => request.abort();
     }, [])
 
-    const getPage = async (url) => {
+    const getPage = async (requestUrl) => {
 
-        if (!url) { return; }
+        if (!requestUrl) { return; }
 
         if (request) {
             request.abort();
@@ -32,19 +42,17 @@ function App(props) {
         setRequest(newRequest);
 
         try {
-            const result = await fetch(url, {
+            const result = await fetch(requestUrl, {
                 signal: newRequest.signal,
             });
-
-            console.log(result)
 
             if (!result.ok) {
                 throw Error(result);
             }
 
-            const { results: people, next, count, previous } = await result.json();
+            const { results, next, count, previous } = await result.json();
 
-            setPeople(people);
+            setResults(results);
             setNext(next);
             setCount(count);
             setPrevious(previous);
@@ -54,22 +62,31 @@ function App(props) {
         }
     }
 
-    const nextPage = async () => {
-        await getPage(next);
-        setPage(page + 1)
-    }
+    return { 
+        results, 
+        pagination: {
+            page, getNext, getPrevious, count,
+            next, previous, pageSize,
+        }
+    };
+}
 
-    const previousPage = async () => {
-        await getPage(previous);
-        setPage(page - 1);
-    }
+const AppHook = (props) => {
+
+    const { 
+        results, 
+        pagination: {
+            page, getNext, getPrevious, count,
+            next, previous, pageSize,
+        }
+    } = useSWAPI('https://swapi.co/api/people');
     console.log(++renders)
     return (
         <div className="App">
-            {people.map(person => (<Person key={person.name} {...person}/>))}
+            {results.map(person => (<Person key={person.name} {...person}/>))}
             <div className='pagination'>
                 <button 
-                    onClick={previousPage}
+                    onClick={getPrevious}
                     disabled={!previous}
                 >
                     previous
@@ -78,7 +95,7 @@ function App(props) {
                     showing {(page - 1) * pageSize  + 1} - {Math.min((page) * pageSize,  count || 0) } of {count}
                 </div>
                 <button 
-                    onClick={nextPage}
+                    onClick={getNext}
                     disabled={!next}
                 >
                     next
@@ -88,4 +105,4 @@ function App(props) {
     );
 }
 
-export default App;
+export default AppHook;
